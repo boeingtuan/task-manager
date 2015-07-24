@@ -75,6 +75,45 @@
     }
     
     /**
+     * Adding Middle Layer to authenticate every request
+     * Checking if the request has valid api key in the 'Authorization' header
+     */
+    function authenticate(\Slim\Route $route) {
+        // Getting request headers
+        $headers = apache_request_headers();
+        $response = array();
+        $app = \Slim\Slim::getInstance();
+     
+        // Verifying Authorization Header
+        if (isset($headers['Authorization'])) {
+            $db = new DbHandler();
+     
+            // get the api key
+            $api_key = $headers['Authorization'];
+            // validating api key
+            if (!$db->isValidApiKey($api_key)) {
+                // api key is not present in users table
+                $response["error"] = true;
+                $response["message"] = "Access Denied. Invalid Api key";
+                echoResponse(401, $response);
+                $app->stop();
+            } else {
+                global $user_id;
+                // get user primary key id
+                $user = $db->getUserId($api_key);
+                if ($user != NULL)
+                    $user_id = $user["id"];
+            }
+        } else {
+            // api key is missing in header
+            $response["error"] = true;
+            $response["message"] = "Api key is misssing";
+            echoResponse(400, $response);
+            $app->stop();
+        }
+    }
+    
+    /**
      * User Registration
      * url - /register
      * method - POST
@@ -111,6 +150,108 @@
             $response["message"] = "Sorry, this email already existed";
             echoResponse(200, $response);
         }
+    });
+    
+    /**
+     * User Login
+     * url - /login
+     * method - POST
+     * params - email, password
+     */
+    $app->post('/login', function() use ($app) {
+        // check for required params
+        verifyRequiredParams(array('email', 'password'));
+
+        // reading post params
+        $email = $app->request()->post('email');
+        $password = $app->request()->post('password');
+        $response = array();
+
+        $db = new DbHandler();
+        // check for correct email and password
+        if ($db->checkLogin($email, $password)) {
+            // get the user by email
+            $user = $db->getUserByEmail($email);
+
+            if ($user != NULL) {
+                $response["error"] = false;
+                $response['name'] = $user['name'];
+                $response['email'] = $user['email'];
+                $response['apiKey'] = $user['api_key'];
+                $response['createdAt'] = $user['created_at'];
+            } 
+            else {
+                // unknown error occurred
+                $response['error'] = true;
+                $response['message'] = "An error occurred. Please try again";
+            }
+        } 
+        else {
+            // user credentials are wrong
+            $response['error'] = true;
+            $response['message'] = 'Login failed. Incorrect credentials';
+        }
+
+        echoResponse(200, $response);
+    });
+    
+    /**
+     * Creating new task in db
+     * method POST
+     * params - name
+     * url - /tasks/
+     */
+    $app->post('/tasks', 'authenticate', function() use ($app) {
+        // check for required params
+        verifyRequiredParams(array('task'));
+
+        $response = array();
+        $task = $app->request->post('task');
+
+        global $user_id;
+        $db = new DbHandler();
+
+        // creating new task
+        $task_id = $db->createTask($user_id, $task);
+
+        if ($task_id != NULL) {
+            $response["error"] = false;
+            $response["message"] = "Task created successfully";
+            $response["task_id"] = $task_id;
+        } 
+        else {
+            $response["error"] = true;
+            $response["message"] = "Failed to create task. Please try again";
+        }
+        echoResponse(201, $response);
+    });    
+    /**
+     * Listing all tasks of particual user
+     * method GET
+     * url /tasks          
+     */
+    $app->get('/tasks', 'authenticate', function() {
+        global $user_id;
+        $response = array();
+        $db = new DbHandler();
+
+        // fetching all user tasks
+        $result = $db->getAllUserTasks($user_id);
+
+        $response["error"] = false;
+        $response["tasks"] = array();
+
+        // looping through result and preparing tasks array
+        while ($task = $result->fetch_assoc()) {
+            $tmp = array();
+            $tmp["id"] = $task["id"];
+            $tmp["task"] = $task["task"];
+            $tmp["status"] = $task["status"];
+            $tmp["createdAt"] = $task["created_at"];
+            array_push($response["tasks"], $tmp);
+        }
+
+        echoResponse(200, $response);
     });
     
     $app->run();

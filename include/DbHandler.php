@@ -70,10 +70,11 @@
       public function checkLogin($email, $password) {
         // fetching user by email
         $stmt = $this->conn->prepare("SELECT password_hash FROM users WHERE email = ?");
-        $stmt->bindParam("s", $emai);
+        $stmt->bind_Param("s", $email);
         $stmt->execute();
         $stmt->bind_result($password_hash);
         $stmt->store_result();
+        
         if ($stmt->num_rows > 0) {
             // Found user with the email
             // Now verify the password
@@ -117,7 +118,7 @@
        * @param String $email User email id
        */
       public function getUserByEmail($email) {
-        $stmt = $stmt->conn->prepare("SELECT name, email, api_key, status, created_at FROM users WHERE email = ?");
+        $stmt = $this->conn->prepare("SELECT name, email, api_key, status, created_at FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         if ($stmt->execute()) {
             $user = $stmt->get_result()->fetch_assoc();
@@ -165,7 +166,7 @@
        * @param String $api_key user api key
        * @return boolean
        */  
-      public function isValidApiKey() {
+      public function isValidApiKey($api_key) {
         $stmt = $this->conn->prepare("SELECT id from users WHERE api_key = ?");
         $stmt->bind_param("s", $api_key);
         $stmt->execute();
