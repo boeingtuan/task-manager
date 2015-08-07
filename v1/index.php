@@ -21,8 +21,8 @@
         
         // Handling PUT request params
         if ($_SERVER['REQUEST_METHOD'] == 'PUT') {
-            $app = \Slim\Slim::getInstance();
-            parse_str($app->request()->getBody(), $request_params);            
+            $app = \Slim\Slim::getInstance();            
+            parse_str($app->request()->getBody(), $request_params);                 
         }
         
         foreach ($required_fields as $field) {
@@ -251,6 +251,94 @@
             array_push($response["tasks"], $tmp);
         }
 
+        echoResponse(200, $response);
+    });
+    
+    /**
+     * Listing single task of particual user
+     * method GET
+     * url /tasks/:id
+     * Will return 404 if the task doesn't belongs to user
+     */
+    $app->get('/tasks/:id', 'authenticate', function($task_id) {
+            global $user_id;
+            $response = array();
+            $db = new DbHandler();
+ 
+            // fetch task
+            $result = $db->getTask($task_id, $user_id);
+ 
+            if ($result != NULL) {
+                $response["error"] = false;
+                $response["id"] = $result["id"];
+                $response["task"] = $result["task"];
+                $response["status"] = $result["status"];
+                $response["createdAt"] = $result["created_at"];
+                echoResponse(200, $response);
+            } else {
+                $response["error"] = true;
+                $response["message"] = "The requested resource doesn't exists";
+                echoResponse(404, $response);
+            }
+        });
+ 
+    /**
+     * Updating existing task
+     * method PUT
+     * params task, status
+     * url - /tasks/:id
+     */
+    $app->put('/tasks/:id', 'authenticate', function($task_id) use($app) {
+        // check for required params
+        verifyRequiredParams(array('task', 'status'));
+
+        global $user_id;
+        $request_params = array();
+        
+        parse_str($app->request()->getBody(), $request_params);            
+        $task = $request_params['task'];
+        $status = $request_params['status'];
+
+        echo $task;
+
+        $db = new DbHandler();
+        $response = array();
+
+        // updating task
+        $result = $db->updateTask($user_id, $task_id, $task, $status);
+        if ($result) {
+            // task updated successfully
+            $response["error"] = false;
+            $response["message"] = "Task updated successfully";
+        } else {
+            // task failed to update
+            $response["error"] = true;
+            $response["message"] = "Task failed to update. Please try again!";
+        }
+        echoResponse(200, $response);
+    });
+     
+     
+    /**
+     * Deleting task. Users can delete only their tasks
+     * method DELETE
+     * url /tasks
+     */
+    $app->delete('/tasks/:id', 'authenticate', function($task_id) use($app) {
+        global $user_id;
+
+        $db = new DbHandler();
+        $response = array();
+        $result = $db->deleteTask($user_id, $task_id);
+        if ($result) {
+            // task deleted successfully
+            $response["error"] = false;
+            $response["message"] = "Task deleted succesfully";
+        } else {
+            // task failed to delete
+            $response["error"] = true;
+            $response["message"] = "Task failed to delete. Please try again!";
+        }
         echoResponse(200, $response);
     });
     

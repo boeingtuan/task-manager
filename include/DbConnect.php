@@ -14,7 +14,7 @@
      */ 
      
      function connect() {
-        include_once dirname(__FILE__) . './Config.php';
+        include_once dirname(__FILE__) . '/Config.php';
         
         // Connecting to mysql database
         $this->conn = new mysqli(DB_HOST, DB_USERNAME,DB_PASSWORD, DB_NAME);
